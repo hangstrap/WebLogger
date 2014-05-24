@@ -1,0 +1,11 @@
+name: web_logger
+version: 0.1.1
+author: Richard Schmidt
+dependencies:
+  http_server: any
+  route: any
+dev_dependencies:
+  browser: any
+  mock: any
+  typed_mock: any
+  unittest: any
