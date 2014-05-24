@@ -3,6 +3,7 @@ version: 0.1.1
 author: Richard Schmidt
 dependencies:
   http_server: any
+  jsonx: any
   route: any
 dev_dependencies:
   browser: any
