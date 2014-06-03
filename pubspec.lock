@@ -13,6 +13,10 @@ packages:
     description: http_server
     source: hosted
     version: "0.9.2"
+  jsonx:
+    description: jsonx
+    source: hosted
+    version: "1.2.1"
   logging:
     description: logging
     source: hosted
