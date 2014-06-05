@@ -10,6 +10,7 @@ import 'dart:html';
 
 @proxy
 class MockWebSocket extends Mock implements WebSocket {
+  
   StreamController openStreamController = new StreamController();
   Stream<Event> get onOpen => openStreamController.stream;
   StreamController closeStreamController = new StreamController();
@@ -19,16 +20,19 @@ class MockWebSocket extends Mock implements WebSocket {
   int readyState;
 }
 
-@proxy
-class MockWebSocketFactory extends Mock {
 
-  final MockWebSocket mockWebSocket;
-  MockWebSocketFactory(this.mockWebSocket) {
-    when(callsTo("createWebSocket")).thenReturn(mockWebSocket, 1000);
+class WebSocketFactory {
 
+  List<MockWebSocket> sockets = [];
+  int calls = 0;
+
+  MockWebSocket get lastMockWebSocket => sockets.last;
+  
+  WebSocket createWebSocket(String url) {
+    calls++;
+    sockets.add(new MockWebSocket());
+    return lastMockWebSocket;
   }
-  MockWebSocket createWebSocket(String url) => super.createWebSocket(url);
-
 }
 
 
@@ -42,45 +46,41 @@ void main() {
   //Catch the last log record to make testing easier
   Logger.root.onRecord.listen((r) => lastRecord = r);
 
-
-
-
-
   group("When the socket is opened ", () {
-    WebLoggerHandler underTest;
 
-    MockWebSocket webSocket = new MockWebSocket();
-    MockWebSocketFactory webSocketFactory = new MockWebSocketFactory(webSocket);
+    WebLoggerHandler underTest;
+    WebSocketFactory webSocketFactory;
 
     setUp(() {
-      webSocket = new MockWebSocket();
-      webSocketFactory = new MockWebSocketFactory(webSocket);
-
-      //fire the onOpen event
-      webSocket.openStreamController.add(new Event("onOpen"));
-      webSocket.readyState = WebSocket.OPEN;
-
+      webSocketFactory = new WebSocketFactory();
       underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
 
+      //fire the onOpen event
+      webSocketFactory.lastMockWebSocket.openStreamController.add(new Event("onOpen"));
+      webSocketFactory.lastMockWebSocket.readyState = WebSocket.OPEN;
     });
     tearDown(() {
       underTest.close();
     });
     test("the web socket should be created with the correct parameter", () {
-      webSocketFactory.getLogs(callsTo("createWebSocket", "testUrl")).verify(happenedOnce);
+      expect(webSocketFactory.calls, equals(1));
     });
     test("it should first send the sessionID to the server", () {
 
       return new Future.value().then((_) {
         String message = Json.encode(new Message("sessionID", "NameOfSession"));
-        webSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
       });
 
     });
     test("it should fire the open event", () {
-        return underTest.events.first.then((Event e) {
-          expect(e.type, equals("webSocketOpened"));
-        });
+
+      Timer t = createDurationTimeout(3);
+
+      underTest.events.first.then(expectAsync((Event e) {
+        expect(e.type, equals("webSocketOpened"));
+        cancelTimeout(t);
+      }));
     });
 
     test("it should send any log records to the server", () {
@@ -90,40 +90,40 @@ void main() {
         log.info("a message");
 
         String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
       });
     });
     test("it should not send any log records if the socket is in the CONNECTING state", () {
 
       return new Future.value().then((_) {
 
-        webSocket.readyState = WebSocket.CONNECTING;
+        webSocketFactory.lastMockWebSocket.readyState = WebSocket.CONNECTING;
         log.info("not sent");
 
         String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
       });
     });
     test("it should not send any log records if the socket is in the CLOSING state", () {
 
       return new Future.value().then((_) {
 
-        webSocket.readyState = WebSocket.CLOSING;
+        webSocketFactory.lastMockWebSocket.readyState = WebSocket.CLOSING;
         log.info("not sent");
 
         String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
       });
     });
     test("it should not send any log records if the socket is in the CLOSED state", () {
 
       return new Future.value().then((_) {
 
-        webSocket.readyState = WebSocket.CLOSED;
+        webSocketFactory.lastMockWebSocket.readyState = WebSocket.CLOSED;
         log.info("not sent");
 
         String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
       });
     });
 
@@ -131,7 +131,7 @@ void main() {
     group("When the user calls 'close()", () {
       test("the webSockets close() should be called", () {
         underTest.close();
-        webSocket.getLogs(callsTo("close")).verify(happenedOnce);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("close")).verify(happenedOnce);
       });
     });
   });
@@ -139,36 +139,92 @@ void main() {
   group("When an error event occures", () {
 
     WebLoggerHandler underTest;
-    MockWebSocket webSocket = new MockWebSocket();
-    ;
-    MockWebSocketFactory webSocketFactory = new MockWebSocketFactory(webSocket);
-
+    MockWebSocket webSocket;
+    WebSocketFactory webSocketFactory;
 
     setUp(() {
 
-      webSocket = new MockWebSocket();
-      ;
-      webSocketFactory = new MockWebSocketFactory(webSocket);
-
-      //fire the onOpen event and then the error one
-      webSocket.openStreamController.add(new Event("onOpen"));
-      webSocket.errorStreamControlleradd(new Event("onError"));
-      webSocket.readyState = WebSocket.OPEN;
-
+      webSocketFactory = new WebSocketFactory();
       underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
+
+      //When the socket is opened, the socket then fires a onError event
+      underTest.events.first.then((e) {
+        webSocketFactory.lastMockWebSocket.errorStreamController.add(new Event("onError"));
+      });
+      //Open the socket to get things going
+      webSocketFactory.lastMockWebSocket.openStreamController.add(new Event("onOpen"));
+      webSocketFactory.lastMockWebSocket.readyState = WebSocket.OPEN;
+
     });
     tearDown(() {
       underTest.close();
     });
 
-    test("the websocket.close() should be called", () {
-      return new Future.value().then((_) {
-        webSocket.getLogs(callsTo("close")).verify(happenedOnce);
+    test("the original websocket.close() should be called", () {
+
+      return new Future.delayed( new Duration( milliseconds:200), (){
+        webSocketFactory.sockets.first.getLogs(  callsTo("close")).verify(happenedOnce);
+      });
+      
+    });
+    test("a new Socket should be created after the testing reopenDelay of 100 milliseconds", () {
+      
+      return new Future.delayed( new Duration( milliseconds:200), (){        
+        expect(webSocketFactory.calls, equals(2));
       });
     });
-    test("a new Socket should be created", () {
-      webSocketFactory.getLogs(callsTo("createWebSocket", "testUrl")).verify(happenedExactly(2));
-
-    });
   });
+
+  group("When an close event occures", () {
+
+      WebLoggerHandler underTest;
+      MockWebSocket webSocket;
+      WebSocketFactory webSocketFactory;
+
+      setUp(() {
+
+        webSocketFactory = new WebSocketFactory();
+        underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
+
+        //When the socket is opened, the socket then fires a onClose event
+        underTest.events.first.then((e) {
+          webSocketFactory.lastMockWebSocket.readyState = WebSocket.CLOSED;
+          webSocketFactory.lastMockWebSocket.closeStreamController.add(new Event("onClose"));
+        });
+        //Open the socket to get things going
+        webSocketFactory.lastMockWebSocket.openStreamController.add(new Event("onOpen"));
+        webSocketFactory.lastMockWebSocket.readyState = WebSocket.OPEN;
+
+      });
+      tearDown(() {
+        underTest.close();
+      });
+
+      test("the original websocket.close() should be called", () {
+
+        return new Future.delayed( new Duration( milliseconds:200), (){
+          webSocketFactory.sockets.first.getLogs(  callsTo("close")).verify(happenedOnce);
+        });
+        
+      });
+      test("a new Socket should be created after the testing reopenDelay of 100 milliseconds", () {
+        
+        return new Future.delayed( new Duration( milliseconds:200), (){        
+          expect(webSocketFactory.calls, equals(2));
+        });
+      });
+    });
+  
+}
+
+
+Timer createDurationTimeout(int period) {
+  return new Timer(new Duration(seconds: 3), () {
+    fail('event not fired in time');
+  });
+}
+void cancelTimeout(Timer t) {
+  if (t != null) {
+    t.cancel();
+  }
 }

@@ -9,23 +9,25 @@ import "dart:async";
 
 
 class WebLoggerHandler {
-
+  final int reopenDelayMSec;
   final CreateWebSocketFunction _createWebSocketFunction;
   final String hostUrl;
   final String sessionID;
-  final StreamController _eventControler  = new StreamController.broadcast();
-  
-  Stream<Event> get events => _eventControler.stream; 
+  final StreamController _eventControler = new StreamController.broadcast();
+
+  Stream<Event> get events => _eventControler.stream;
 
   WebSocket webSocket;
   var logSubscription;
 
   WebLoggerHandler(this.hostUrl, this.sessionID)
-      : this._createWebSocketFunction = _createWebSocket {
+      : this._createWebSocketFunction = _createWebSocket,
+        this.reopenDelayMSec = 10000 {
     _init();
   }
 
-  WebLoggerHandler.createforTest(this._createWebSocketFunction, this.hostUrl, this.sessionID) {
+  WebLoggerHandler.createforTest(this._createWebSocketFunction, this.hostUrl, this.sessionID)
+      : this.reopenDelayMSec = 100 {
     _init();
   }
 
@@ -34,27 +36,39 @@ class WebLoggerHandler {
     webSocket.close();
   }
   void _init() {
+
+    print("Running init()");
     //Listen to logging events
     logSubscription = Logger.root.onRecord.listen((LogRecord rec) {
       _processLoggingEvent(rec);
     });
-    
-    webSocket = _createWebSocketFunction( hostUrl);
-    
-    webSocket.onOpen.first.then((_) {
-      
-      _eventControler.add( new Event( "webSocketOpened"));
-       print("onOpen event has been fired - web socket is connected");
+
+    webSocket = _createWebSocketFunction(hostUrl);
+
+    webSocket.onOpen.forEach((_) {
+
+      _eventControler.add(new Event("webSocketOpened"));
+      print("onOpen event has been fired - web socket is connected");
       _sendMessage("sessionID", sessionID);
 
       webSocket.onError.forEach((e) {
-        print("Web socket error type:${e.type} ${webSocket.readyState}");
-        webSocket.close();
-        _init();
+        _coseAndReopenSocket(e);
+      });
+      webSocket.onClose.forEach((e) {
+        _coseAndReopenSocket(e);
       });
     });
   }
 
+  void _coseAndReopenSocket(Event e) {
+       print("Web socket error type:${e.type} ${webSocket.readyState}");
+    print("closing web socket");
+    close();
+    
+    new Timer(new Duration( milliseconds: reopenDelayMSec), () {
+      _init();
+    });
+  }
   _processLoggingEvent(LogRecord rec) {
     if (webSocket.readyState == WebSocket.OPEN) {
       _sendMessage("logRecord", rec);
@@ -74,7 +88,7 @@ class WebLoggerHandler {
 typedef WebSocket CreateWebSocketFunction(String url);
 
 /** instance of [CreateWebSocketFunction] */
-WebSocket _createWebSocket(String url)=>new WebSocket(url);
+WebSocket _createWebSocket(String url) => new WebSocket(url);
 
 
 
