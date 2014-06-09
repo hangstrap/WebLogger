@@ -9,11 +9,14 @@ import "dart:async";
 
 
 class WebLoggerHandler {
+
+  Logger logger = new Logger("web_logger");
   final int reopenDelayMSec;
   final CreateWebSocketFunction _createWebSocketFunction;
   final String hostUrl;
   final String sessionID;
   final StreamController _eventControler = new StreamController.broadcast();
+  Timer initTimer;
 
   Stream<Event> get events => _eventControler.stream;
 
@@ -32,17 +35,20 @@ class WebLoggerHandler {
   }
 
   void close() {
+
     logSubscription.cancel();
-    webSocket.close();
+    if (webSocket != null) {
+      webSocket.close();
+    }
   }
+  
   void _init() {
 
-    print("Running init()");
     //Listen to logging events
     logSubscription = Logger.root.onRecord.listen((LogRecord rec) {
       _processLoggingEvent(rec);
     });
-
+    logger.fine("creating new WebSocket()");
     webSocket = _createWebSocketFunction(hostUrl);
 
     webSocket.onOpen.forEach((_) {
@@ -57,20 +63,29 @@ class WebLoggerHandler {
       webSocket.onClose.forEach((e) {
         _coseAndReopenSocket(e);
       });
+      //webSocket.onMessage.forEach( (e)=>print( "receved message ${e}"));
     });
   }
 
   void _coseAndReopenSocket(Event e) {
-       print("Web socket error type:${e.type} ${webSocket.readyState}");
-    print("closing web socket");
-    close();
-    
-    new Timer(new Duration( milliseconds: reopenDelayMSec), () {
-      _init();
-    });
+
+
+    //If necessary, start a timer to then reinitilise the socket
+    if ((initTimer == null) || (initTimer.isActive == false)) {
+
+      initTimer = new Timer(new Duration(milliseconds: reopenDelayMSec), () {
+
+        logger.fine("Web socket error type:${e.type} ${webSocket.readyState}");
+        logger.fine("closing web socket");
+        close();
+        webSocket = null;
+
+        _init();
+      });
+    }
   }
   _processLoggingEvent(LogRecord rec) {
-    if (webSocket.readyState == WebSocket.OPEN) {
+    if ((webSocket != null) && (webSocket.readyState == WebSocket.OPEN)) {
       _sendMessage("logRecord", rec);
     }
   }
@@ -79,7 +94,7 @@ class WebLoggerHandler {
 
     Message message = new Message(type, data);
     String json = Json.encode(message);
-    print("About to send ${json}");
+    print("*** About to send ${json}");
     webSocket.sendString(json);
   }
 

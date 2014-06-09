@@ -13,10 +13,16 @@ class MockWebSocket extends Mock implements WebSocket {
   
   StreamController openStreamController = new StreamController();
   Stream<Event> get onOpen => openStreamController.stream;
+  
   StreamController closeStreamController = new StreamController();
   Stream<Event> get onClose => closeStreamController.stream;
+  
   StreamController errorStreamController = new StreamController();
   Stream<Event> get onError => errorStreamController.stream;
+
+  StreamController messageStreamController = new StreamController();
+  Stream<Event> get onMessage => messageStreamController.stream;
+
   int readyState;
 }
 
@@ -147,7 +153,7 @@ void main() {
       webSocketFactory = new WebSocketFactory();
       underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
 
-      //When the socket is opened, the socket then fires a onError event
+      //When the socket is opened, the socket then fires a onError and an onClose event
       underTest.events.first.then((e) {
         webSocketFactory.lastMockWebSocket.errorStreamController.add(new Event("onError"));
       });
@@ -215,6 +221,39 @@ void main() {
       });
     });
   
+  
+  group("When an error and a close event occures", () {
+
+       WebLoggerHandler underTest;
+       MockWebSocket webSocket;
+       WebSocketFactory webSocketFactory;
+
+       setUp(() {
+
+         webSocketFactory = new WebSocketFactory();
+         underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
+
+         //When the socket is opened, the socket then fires a onClose event
+         underTest.events.first.then((e) {
+           webSocketFactory.lastMockWebSocket.errorStreamController.add(new Event("onError"));
+           webSocketFactory.lastMockWebSocket.closeStreamController.add(new Event("onClose"));
+         });
+         //Open the socket to get things going
+         webSocketFactory.lastMockWebSocket.openStreamController.add(new Event("onOpen"));
+         webSocketFactory.lastMockWebSocket.readyState = WebSocket.OPEN;
+
+       });
+       tearDown(() {
+         underTest.close();
+       });
+
+       test("a new Socket should be created after the testing reopenDelay of 100 milliseconds", () {
+         
+         return new Future.delayed( new Duration( milliseconds:200), (){        
+           expect(webSocketFactory.calls, equals(2));
+         });
+       });
+     });
 }
 
 

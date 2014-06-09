@@ -28,13 +28,6 @@ void handleWebSocket(WebSocket webSocket) {
     .map((string) => JSON.decode(string))
     .listen((json) {
       print( json);
-//      // The JSON object should contains a 'request' entry.
-//      var request = json['request'];
-//      switch (request) {
-//
-//        default:
-//          log.warning("Invalid request: '$request'");
-//      }
       webSocket.add( "here you are");
     }, onError: (error) {
       log.warning('Bad WebSocket request ${error}');
