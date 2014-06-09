@@ -45,17 +45,21 @@ class WebSocketFactory {
 
 void main() {
   useHtmlEnhancedConfiguration();
-  LogRecord lastRecord;
+  List<LogRecord> logRecords =[];
+  String lastLogRecordAsMessage() => Json.encode(new Message("logRecord", logRecords.last));
 
+  
   Logger.root.level = Level.ALL;
-  Logger log = new Logger("myLogger");
-  //Catch the last log record to make testing easier
-  Logger.root.onRecord.listen((r) => lastRecord = r);
+  Logger.root.onRecord.listen((r) => logRecords.add( r));
 
+  Logger log = new Logger("myLogger");
+
+  
     WebLoggerHandler underTest;
     WebSocketFactory webSocketFactory;
 
     setUp(() {
+      logRecords.clear();
       webSocketFactory = new WebSocketFactory();
       underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
     });
@@ -97,8 +101,7 @@ void main() {
 
         log.info("a message");
 
-        String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", lastLogRecordAsMessage())).verify(happenedOnce);
       });
     });
     test("it should not send any log records if the socket is in the CONNECTING state", () {
@@ -108,8 +111,7 @@ void main() {
         webSocketFactory.lastMockWebSocket.readyState = WebSocket.CONNECTING;
         log.info("not sent");
 
-        String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", lastLogRecordAsMessage())).verify(neverHappened);
       });
     });
     test("it should not send any log records if the socket is in the CLOSING state", () {
@@ -119,8 +121,7 @@ void main() {
         webSocketFactory.lastMockWebSocket.readyState = WebSocket.CLOSING;
         log.info("not sent");
 
-        String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", lastLogRecordAsMessage())).verify(neverHappened);
       });
     });
     test("it should not send any log records if the socket is in the CLOSED state", () {
@@ -130,11 +131,9 @@ void main() {
         webSocketFactory.lastMockWebSocket.readyState = WebSocket.CLOSED;
         log.info("not sent");
 
-        String message = Json.encode(new Message("logRecord", lastRecord));
-        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(neverHappened);
+        webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", lastLogRecordAsMessage())).verify(neverHappened);
       });
     });
-
 
     group("When the user calls 'close()", () {
       test("the webSockets close() should be called", () {
@@ -222,6 +221,26 @@ void main() {
          });
        });
      });
+
+
+  group("When the socket is closed", () {
+       setUp(() {
+
+       });
+       test("messages should be stacked untill the socket is opened", () {
+
+         log.info("first log message");  
+         //Open the socket to get things going
+         webSocketFactory.lastMockWebSocket.openStreamController.add(new Event("onOpen"));
+         webSocketFactory.lastMockWebSocket.readyState = WebSocket.OPEN;
+         
+         return new Future.delayed( new Duration( milliseconds:200), (){  
+  
+          webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", lastLogRecordAsMessage())).verify(happenedOnce);
+         });
+       });
+     });
+
 }
 
 

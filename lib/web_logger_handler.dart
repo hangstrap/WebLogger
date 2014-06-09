@@ -19,7 +19,9 @@ class WebLoggerHandler {
   Timer initTimer;
 
   Stream<Event> get events => _eventControler.stream;
-
+  List<LogRecord> logRecordsToSend = [];
+  
+  
   WebSocket webSocket;
   var logSubscription;
 
@@ -56,6 +58,7 @@ class WebLoggerHandler {
       _eventControler.add(new Event("webSocketOpened"));
       print("onOpen event has been fired - web socket is connected");
       _sendMessage("sessionID", sessionID);
+      _sendLogRecords();
 
       webSocket.onError.forEach((e) {
         _coseAndReopenSocket(e);
@@ -85,11 +88,20 @@ class WebLoggerHandler {
     }
   }
   _processLoggingEvent(LogRecord rec) {
-    if ((webSocket != null) && (webSocket.readyState == WebSocket.OPEN)) {
-      _sendMessage("logRecord", rec);
-    }
+    
+    logRecordsToSend.add( rec);
+    _sendLogRecords();
   }
 
+  void _sendLogRecords(){
+    while( logRecordsToSend.isNotEmpty && _isSocketOpen()){
+      _sendMessage("logRecord", logRecordsToSend.removeAt(0));
+    }
+  }
+  bool _isSocketOpen(){
+    return    ((webSocket != null) && (webSocket.readyState == WebSocket.OPEN));      
+  }
+  
   _sendMessage(String type, Object data) {
 
     Message message = new Message(type, data);
