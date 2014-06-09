@@ -7,7 +7,7 @@ import 'package:logging/logging.dart';
 import 'package:mock/mock.dart';
 import 'package:jsonx/jsonx.dart' as Json;
 import 'dart:html';
-
+ 
 @proxy
 class MockWebSocket extends Mock implements WebSocket {
   
