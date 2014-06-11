@@ -1,4 +1,4 @@
-import 'package:web_logger/web_logger_handler.dart';
+import 'package:web_logger/web_logger_client.dart';
 import 'package:logging/logging.dart';
 import 'dart:async';
 import 'dart:html';
@@ -17,10 +17,10 @@ void main() {
   });
   log.info("hello world");
 
-  WebLoggerHandler underTest;
+  WebLoggerClient underTest;
   String hostUrl = 'ws://localhost:8421/ws';
   print(hostUrl);
-  underTest = new WebLoggerHandler(hostUrl, "sessionID");
+  underTest = new WebLoggerClient(hostUrl, "sessionID");
 
   new Timer.periodic(new Duration(seconds: 15), (Timer t) {
 

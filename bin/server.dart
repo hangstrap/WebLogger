@@ -41,12 +41,6 @@ void main() {
     print('${rec.level.name}: ${rec.time}: ${rec.message}');
   });
 
-  var buildPath = Platform.script.resolve('../web').toFilePath();
-  if (!new Directory(buildPath).existsSync()) {
-    log.severe("The '${buildPath}/' directory was not found. Please run 'pub build'.");
-    return;
-  }
-
   int port = 8421;  // TODO use args from command line to set this
 
   HttpServer.bind(InternetAddress.LOOPBACK_IP_V4, port).then((server) {
@@ -59,35 +53,5 @@ void main() {
       .transform(new WebSocketTransformer())
       .listen(handleWebSocket);
 
-    // Set up default handler. This will serve files from our 'build' directory.
-    var virDir = new http_server.VirtualDirectory(buildPath);
-    // Disable jail root, as packages are local symlinks.
-    virDir.jailRoot = false;
-    virDir.allowDirectoryListing = true;
-    virDir.directoryHandler = (dir, request) {
-
-      // Redirect directory requests to index.html files.      
-      var indexUri = new Uri.file(dir.path).resolve('web_logger_handler_test.html');
-      log.info( "About to server ${indexUri}");
-          
-      virDir.serveFile(new File(indexUri.toFilePath()), request);
-    };
-
-    // Add an error page handler.
-    virDir.errorPageHandler = (HttpRequest request) {
-      log.warning("Resource not found: ${request.uri.path}");
-      request.response.statusCode = HttpStatus.NOT_FOUND;
-      request.response.close();
-    };
-    // Serve everything not routed elsewhere through the virtual directory.
-    virDir.serve(router.defaultStream);
-
-//    // Special handling of client.dart. Running 'pub build' generates
-//    // JavaScript files but does not copy the Dart files, which are
-//    // needed for the Dartium browser.
-//    router.serve("/web_logger_handler_test.dart").listen((request) {
-//      Uri clientScript = Platform.script.resolve("../web/web_logger_handler_test.dart");
-//      virDir.serveFile(new File(clientScript.toFilePath()), request);
-//    });
   });
 }

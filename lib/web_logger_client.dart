@@ -1,4 +1,4 @@
-library web_logger;
+library web_logger_client;
 import "package:logging/logging.dart";
 import 'package:jsonx/jsonx.dart' as Json;
 
@@ -6,9 +6,10 @@ import 'package:jsonx/jsonx.dart' as Json;
 import "dart:html";
 import "dart:async";
 
-
-
-class WebLoggerHandler {
+/**
+* Sends all log messages to a server WebSocket 
+*/
+class WebLoggerClient {
 
   Logger logger = new Logger("web_logger");
   final int reopenDelayMSec;
@@ -25,13 +26,13 @@ class WebLoggerHandler {
   WebSocket webSocket;
   var logSubscription;
 
-  WebLoggerHandler(this.hostUrl, this.sessionID)
+  WebLoggerClient(this.hostUrl, this.sessionID)
       : this._createWebSocketFunction = _createWebSocket,
         this.reopenDelayMSec = 10000 {
     _init();
   }
 
-  WebLoggerHandler.createforTest(this._createWebSocketFunction, this.hostUrl, this.sessionID)
+  WebLoggerClient.createforTest(this._createWebSocketFunction, this.hostUrl, this.sessionID)
       : this.reopenDelayMSec = 100 {
     _init();
   }

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:unittest/unittest.dart';
 import 'package:unittest/html_enhanced_config.dart';
 
-import 'package:web_logger/web_logger_handler.dart';
+import 'package:web_logger/web_logger_client.dart';
 import 'package:logging/logging.dart';
 import 'package:mock/mock.dart';
 import 'package:jsonx/jsonx.dart' as Json;
@@ -55,13 +55,13 @@ void main() {
   Logger log = new Logger("myLogger");
 
   
-    WebLoggerHandler underTest;
+    WebLoggerClient underTest;
     WebSocketFactory webSocketFactory;
 
     setUp(() {
       logRecords.clear();
       webSocketFactory = new WebSocketFactory();
-      underTest = new WebLoggerHandler.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
+      underTest = new WebLoggerClient.createforTest(webSocketFactory.createWebSocket, "testUrl", "NameOfSession");
     });
     tearDown(() {
       underTest.close();
