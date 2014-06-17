@@ -46,7 +46,7 @@ class WebSocketFactory {
 void main() {
   useHtmlEnhancedConfiguration();
   List<LogRecord> logRecords =[];
-  String lastLogRecordAsMessage() => Json.encode(new Message("logRecord", logRecords.last));
+  String lastLogRecordAsMessage() => Json.encode(new WebLoggerMessage("logRecord", logRecords.last));
 
   
   Logger.root.level = Level.ALL;
@@ -80,7 +80,7 @@ void main() {
     test("it should first send the sessionID to the server", () {
 
       return new Future.value().then((_) {
-        String message = Json.encode(new Message("sessionID", "NameOfSession"));
+        String message = Json.encode(new WebLoggerMessage("sessionID", "NameOfSession"));
         webSocketFactory.lastMockWebSocket.getLogs(callsTo("sendString", message)).verify(happenedOnce);
       });
 

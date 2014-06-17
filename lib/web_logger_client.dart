@@ -106,7 +106,7 @@ class WebLoggerClient {
 
   _sendMessage(String type, Object data) {
 
-    Message message = new Message(type, data);
+    WebLoggerMessage message = new WebLoggerMessage(type, data);
     String json = Json.encode(message);
     print("*** About to send ${json}");
     webSocket.sendString(json);
@@ -121,8 +121,8 @@ WebSocket _createWebSocket(String url) => new WebSocket(url);
 
 
 
-class Message<T> {
+class WebLoggerMessage<T> {
   String type;
   T data;
-  Message(this.type, this.data);
+  WebLoggerMessage(this.type, this.data);
 }
