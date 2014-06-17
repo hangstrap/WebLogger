@@ -6,18 +6,14 @@ import 'package:unittest/unittest.dart';
 import 'package:route/server.dart' show Router;
 
 
-import 'package:web_logger/web_logger_server.dart';
-import 'package:logging/logging.dart';
+import 'package:web_logger/web_logger_server.dart' as web_logger_server;
 import 'package:mock/mock.dart';
-import 'package:jsonx/jsonx.dart' as Json;
+
 
 class MockHttpServer extends Mock implements HttpServer {}
 
-class MockStreamListener extends Mock implements Stream {
-  MockStream() {
+class MockStreamListener extends Mock implements Stream {}
 
-  }
-}
 class MockStream extends Mock implements Stream {
   MockStream(MockStreamListener mockStreamListener) {
     when(callsTo("transform")).alwaysReturn(mockStreamListener);
@@ -30,48 +26,54 @@ class MockRouter extends Mock implements Router {
   }
 }
 
-void handleWebSocket(WebSocket webSocket) {
-
-}
+void webSocketHandlerFunction(WebSocket webSocket) {}
 
 void main() {
 
+  MockStreamListener mockStreamListener;
+  MockStream mockStream;
+  MockRouter mockRouter;
+  MockHttpServer mockHttpServer;
+
   group("createWebSocketRouter procedure", () {
 
+    setUp(() {
+      mockHttpServer = new MockHttpServer();
+      mockStreamListener = new MockStreamListener();
+      mockStream = new MockStream(mockStreamListener);
+      mockRouter = new MockRouter(mockStream);
+
+      Router testCreateRouterFactoryFunction(HttpServer server) {
+        return mockRouter;
+      }
+      //replace the factory method with the test method
+      web_logger_server.createRouterFactoryFunction = testCreateRouterFactoryFunction;
+    });
     test("should return a new router", () {
 
-
-
-      Router result = createWebSocketRouter(new MockHttpServer(), "ws", handleWebSocket);
-      expect(result, isNotNull);
+      Router result = web_logger_server.createWebSocketRouter(mockHttpServer, "ws", webSocketHandlerFunction);
+      expect(result, equals(mockRouter));
     });
 
-    test("should add the correct context", () {
+    test("router should have the correct context added to it", () {
 
-      MockRouter mockRouter = new MockRouter(new MockStream(new MockStreamListener()));
-      addWebSocketContext(mockRouter, "ws", handleWebSocket);
+      web_logger_server.createWebSocketRouter(mockHttpServer, "ws", webSocketHandlerFunction);
       mockRouter.getLogs(callsTo("serve", "ws")).verify(happenedOnce);
     });
 
-    test("should add a WebSocketTransfomer as a transformer", () {
+    test("should add a WebSocketTransfomer as a transformer to the context", () {
 
-      MockStream mockStream = new MockStream(new MockStreamListener());
-      MockRouter mockRouter = new MockRouter(mockStream);
-      addWebSocketContext(mockRouter, "ws", handleWebSocket);
-      mockStream.getLogs(callsTo("transform", anything)).verify(happenedOnce);
+      web_logger_server.createWebSocketRouter(mockHttpServer, "ws", webSocketHandlerFunction);
+
       mockStream.getLogs(callsTo("transform", new isInstanceOf<WebSocketTransformer>())).verify(happenedOnce);
 
     });
 
     test("the transfomer listen() method should call the handler", () {
 
-      MockStreamListener mockStreamListener = new MockStreamListener();
-      MockRouter mockRouter = new MockRouter(new MockStream(mockStreamListener));
-      addWebSocketContext(mockRouter, "ws", handleWebSocket);
+      web_logger_server.createWebSocketRouter(mockHttpServer, "ws", webSocketHandlerFunction);
 
-      mockStreamListener.getLogs(callsTo("listen", anything)).verify(happenedOnce);
-      mockStreamListener.getLogs(callsTo("listen", new isInstanceOf<HandleWebSocket>())).verify(happenedOnce);
-      mockStreamListener.getLogs(callsTo("listen", equals( handleWebSocket))).verify( happenedOnce);
+      mockStreamListener.getLogs(callsTo("listen", equals(webSocketHandlerFunction))).verify(happenedOnce);
     });
   });
 }
